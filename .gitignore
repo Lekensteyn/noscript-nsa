@@ -1,0 +1,4 @@
+*.xpi
+.*.sw*
+latest
+src.old

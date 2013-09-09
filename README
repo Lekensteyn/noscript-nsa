@@ -1,0 +1,38 @@
+This repository contains the version history for NoScript NSA Firefox (mobile)
+add-on. The utility script `version.sh` and this README is based on
+https://github.com/avian2/noscript.
+
+Files in the `src/` subdirectory were extracted from XPI files downloaded from
+http://noscript.net/nsa/, but slightly modified:
+
+- The subdirectory named after the NoScript NSA version has been renamed to
+  `noscript-nsa` for consistency.
+- resource URLs of the form `noscript_3_5foo` have been modified to
+  `noscript_@VERSION@` (applicable to most `.js`, `.jsm` and `install.rdf`
+  files.
+- The version number `3.5foo` in `bootstrap.js` has been substituted with
+  `@VERSION`.
+- Every file now consistently used LF as line endings instead of CRLF.
+- Every text file now ends with a new line. This plays nicier with diff tools
+  and vim.
+
+Following copyright notice appears in the latest version at the time of
+writing. Please refer to the files in the `src/` subdirectory for details.
+
+
+NoScript Anywhere - NoScript Mobile Multiprocessing PoC
+Copyright (C) 2010-2011 Giorgio Maone - giorgio@maone.net
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
