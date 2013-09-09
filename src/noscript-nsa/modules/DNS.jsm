@@ -70,7 +70,7 @@ var DNS = {
     logFile.append("noscript_dns.log");
     return this.logFile = logFile;
   },
-  logEnabled: false,
+  logEnabled: true || false,
   log: function(msg) {
     try {
       if (!this.logStream) {

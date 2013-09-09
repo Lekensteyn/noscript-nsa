@@ -289,6 +289,7 @@ const ABE = {
           ABE.log(host + " not cached in DNS, deferring ABE checks after DNS resolution for request " + req.serial);
           
           DNS.resolve(host, 0, function(dnsRecord) {
+		  log("[ABE thingey] dnsRecord = " + JSON.stringify(dnsRecord));
             req.dnsNotified = true; // prevents spurious notifications
             replacement.open();
           });
