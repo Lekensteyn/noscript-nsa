@@ -81,7 +81,7 @@ var ScriptSurrogate = {
       if (!value) return;
       let mapping = (name in map)
         ? map[name]
-        : map[name] = new SurrogateMapping();
+        : map[name] = new SurrogateMapping(name);
       switch(member) {
         case "sources":
           let prefix = true;
@@ -102,11 +102,7 @@ var ScriptSurrogate = {
           value = new AddressMatcher(value);
           break;
         
-        case "replacement":
-          if (!this.syntaxChecker.check(value)) {
-            Cu.reportError(mapping.error = this.syntaxChecker.lastError);
-          }
-          break;
+        // case "replacement": // deferred, see SurrogateMapping.replacement
         
         default:
           return;
@@ -124,6 +120,27 @@ var ScriptSurrogate = {
     Thread.asap(this._syncPrefs, this);
   },
   
+  initReplacement: function(m) {
+    var r;
+    try {
+      r = this.prefs.getCharPref(m.name + ".replacement");
+      
+      if (/^(?:file:\/\/|\.\.?\/)/.test(r)) {
+        r = IO.readFile(IOS.newURI(this._resolveFile(mapping.replacement), null, null)
+              .QueryInterface(Ci.nsIFileURL).file);
+      }
+      
+      if (r && !this.syntaxChecker.check(r)) {
+        throw this.syntaxChecker.lastError;
+      }
+    } catch (e) {
+      m.error = e;
+      Cu.reportError("Error loading " + m.name + " surrogate: " + e + (r ? "\n" + r : ""));
+      r = "";
+    }
+    return r;
+  },
+  
   _resolveFile: function(fileURI) {
     const profileURI = IOS.newFileURI(
       Cc["@mozilla.org/file/directory_service;1"].getService(Ci.nsIProperties)
@@ -133,10 +150,10 @@ var ScriptSurrogate = {
     })(fileURI);
   },
   
-  getScripts: function(scriptURL, pageURL, noScript, scripts) {
+    getScripts: function(scriptURL, pageURL, noScript, scripts) {
 
     var isPage = scriptURL === pageURL;
-    var code;
+
     const list = noScript
       ? this.mappings.noScript
       : isPage
@@ -152,17 +169,8 @@ var ScriptSurrogate = {
       if (mapping.sources && mapping.sources.test(scriptURL) &&
           !(mapping.exceptions && mapping.exceptions.test(pageURL)) &&
           mapping.replacement) {
-        if (/^(?:file:\/\/|\.\.?\/)/.test(mapping.replacement)) {
-          try {
-            code = IO.readFile(IOS.newURI(this._resolveFile(mapping.replacement), null, null)
-                               .QueryInterface(Ci.nsIFileURL).file);
-          } catch(e) {
-            ns.dump("Error loading " + mapping.replacement + ": " + e);
-            continue;
-          }
-        } else {
-          code = mapping.replacement;
-        }
+        let code = mapping.replacement;
+       
         if (!noScript && mapping.noScript)
           code = 'window.addEventListener("DOMContentLoaded", function(event) {' +
                     code + '}, true)';
@@ -262,11 +270,19 @@ var ScriptSurrogate = {
   }
 }
 
-function SurrogateMapping() {}
+
+function SurrogateMapping(name) {
+  this.name = name;
+  this.__defineGetter__("replacement", this._replacement);
+}
 SurrogateMapping.prototype = {
   sources: null,
-  replacement: null,
+  _replacement: function() {
+    delete this.replacement; 
+    return this.replacement = ScriptSurrogate.initReplacement(this);
+  },
   exceptions: null,
+  error: null,
   
   forPage: false,
   noScript: false,

@@ -246,7 +246,8 @@ const InjectionChecker = {
     "\\b(?:" + fuzzify('location|innerHTML') + ")\\b[\\s\\S]*="
   ),
   _nameRx: new RegExp(
-    "=[\\s\\S]*\\b" + fuzzify('name') + "\\b"
+    "=[\\s\\S]*\\b" + fuzzify('name') + "\\b|" +
+    fuzzify("hostname") + "[\\s\\S]*=[\\s\\S]*\\b(?:\\d{3}|0[xX][a-fA-F0-9]{2})"
   ),
   
   _maybeJSRx: new RegExp(
@@ -283,10 +284,12 @@ const InjectionChecker = {
     expr = // dotted URL components can lead to false positives, let's remove them
       expr.replace(this._removeDotsRx, this._removeDots)
         .replace(this._arrayAccessRx, '_ARRAY_ACCESS_')
-        .replace(/<([\w:]+)>[^<]+<\/\1>/g, '<$1/>'); // reduce XML text nodes
+        .replace(/<([\w:]+)>[^<]+<\/\1>/g, '<$1/>') // reduce XML text nodes
+        .replace(/(^|[=;.+-])\s*[\[(]+/g, '$1') // remove leading parens and braces
+        ;
     
     if (expr.indexOf(")") !== -1) expr += ")"; // account for externally balanced parens
-   if(this._assignmentRx.test(expr) && !this._badRightHandRx.test(expr)) // commonest case, single assignment or simple chained assignments, no break
+    if(this._assignmentRx.test(expr) && !this._badRightHandRx.test(expr)) // commonest case, single assignment or simple chained assignments, no break
       return this._singleAssignmentRx.test(expr) || this._riskyAssignmentRx.test(expr) && this._nameRx.test(expr);
     
     return this._riskyParensRx.test(expr) ||
@@ -830,6 +833,7 @@ const InjectionChecker = {
       return true;
     
     var unescaped = this.urlUnescape(s);
+    let badUTF8 = this.utf8EscapeError;
     
     if (this._checkOverDecoding(s, unescaped))
       return true;
@@ -841,15 +845,23 @@ const InjectionChecker = {
         return true;
       }
     }
-    
-    if (unescaped != s && this._checkRecursive(unescaped, depth))
-      return true;
-    
+
     if (unescaped.indexOf("\x1b(J") !== -1 && this._checkRecursive(unescaped.replace(/\x1b\(J/g, ''), depth) || // ignored in iso-2022-jp
         unescaped.indexOf("\x7e\x0a") !== -1 && this._checkRecursive(unescaped.replace(/\x7e\x0a/g, '')) // ignored in hz-gb-2312       
       )
       return true;
 
+    if (unescaped !== s) {
+      if (badUTF8) {
+        try {
+          if (this._checkRecursive(this.toUnicode(unescaped, "UTF-8"))) return true;
+        } catch (e) {
+          this.log(e);
+        }
+      }
+      if (this._checkRecursive(unescaped, depth)) return true;
+    }
+    
     s = this.ebayUnescape(unescaped);
     if (s != unescaped && this._checkRecursive(s, depth))
       return true;
@@ -901,11 +913,14 @@ const InjectionChecker = {
     );
   },
   
+  utf8EscapeError: false,
   urlUnescape: function(url, brutal) {
     var od = this.utf8OverDecode(url, !brutal);
+    this.utf8EscapeError = false;
     try {
       return decodeURIComponent(od);
     } catch(warn) {
+      this.utf8EscapeError = true;
       if (url != od) url += " (" + od + ")";  
       this.log("Problem decoding " + url + ", maybe not an UTF-8 encoding? " + warn.message);
       return unescape(brutal ? ASPIdiocy.filter(od) : od);
@@ -924,6 +939,22 @@ const InjectionChecker = {
     return url.replace(/Q([\da-fA-F]{2})/g, function(s, c) {
       return String.fromCharCode(parseInt(c, 16));
     });
+  },
+  
+  toUnicode: function(s, charset) {
+    let sis = Cc["@mozilla.org/io/string-input-stream;1"]
+          .createInstance(Ci.nsIStringInputStream);
+    sis.setData(s, s.length);
+    let is = Cc["@mozilla.org/intl/converter-input-stream;1"]
+          .createInstance(Ci.nsIConverterInputStream);
+    is.init(sis, charset || null, 0, is.DEFAULT_REPLACEMENT_CHARACTER);
+    let str = {};
+    if (is.readString(4096, str) === 0) return str.value;
+    let ret = [str.value];
+    while (is.readString(4096, str) !== 0) {
+      ret.push(str.value);
+    }
+    return ret.join('');
   },
   
   checkPost: function(channel, skip, noscript) {

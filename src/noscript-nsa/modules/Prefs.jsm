@@ -159,7 +159,7 @@ PrefsHelper.prototype = {
         case IPB.PREF_STRING:
           return branch.getComplexValue(key, Ci.nsISupportsString).data;
         case IPB.PREF_INT:
-          return prefs.getIntPref(key);
+          return branch.getIntPref(key);
         case IPB.PREF_BOOL:
           return branch.getBoolPref(key);
       }

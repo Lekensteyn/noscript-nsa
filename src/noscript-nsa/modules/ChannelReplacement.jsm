@@ -35,7 +35,9 @@ function ChannelReplacement(chan, newURI, newMethod) {
 
 ChannelReplacement.setLoadingChannel = function(channel, window) {
   if (!window) window = IOUtil.findWindow(channel);
-  if (window) window[LOADING_CHANNEL] = channel;
+  if (window) try {
+    window[LOADING_CHANNEL] = channel;
+  } catch (e) {}
 }
 ChannelReplacement.getLoadingChannel =
   function(window) window && (LOADING_CHANNEL in window) && window[LOADING_CHANNEL];

@@ -74,7 +74,7 @@ const Listener = {
     } catch (e) {
       RequestWatchdog.abort(channel);
       Cu.reportError(e);
-      log("RequestWatchdog aborted " + channel.name + "! Reason: " + e);
+      log("RequestWatchdog aborted " + channel.name + "! Reason: " + e + "\n" + e.stack);
     }
   },
   

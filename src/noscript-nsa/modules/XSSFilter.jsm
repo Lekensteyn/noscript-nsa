@@ -47,6 +47,7 @@ const XSSFilter = {
       IOUtil.attachToChannel(channel, "noscript.checkWindowName", DUMMY_OBJ);
     }
     let postData = (channel instanceof Ci.nsIUploadChannel) && channel.postData || null;
+    // TODO: add charset info to the InjectionChecker calls!!!
     let injection = InjectionChecker.checkURL(url, noscript) ||
         postData && InjectionChecker.checkPost(channel, null, noscript);
 

@@ -35,7 +35,7 @@ const Life = {
   },
   shutdown: function() {
     for (let j = this.started.length; j-- > 0;)
-      try { this.started[j].stop(); } catch (e) {}
+      try { this.started[j].shutdown(); } catch (e) {}
     this.started = [];
   }
 };

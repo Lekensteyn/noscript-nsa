@@ -53,6 +53,9 @@ UI.prototype = {
   init: function(delayed) {
     let w = this.win;
     if (w !== w.top) return;
+    
+    w.nsaUI = this;
+    
     let d = w.document;
     let root = d.documentElement;
     if (!root) return;
@@ -74,8 +77,6 @@ UI.prototype = {
       trigger.blur(); // prevents focus rect
       this.showPermissionsManager();
     }, true);
-    
-    w.nsaUI = this;
     
     this.sync();
     
@@ -298,8 +299,10 @@ UI.prototype = {
       }, true);
       
       w._onHide = this.addListener(w, "pagehide", function(ev) {
-        this.hide();
-        this.dialog = this.overlay = null;
+        if (ev.target === ev.currentTarget) {
+          this.hide();
+          this.dialog = this.overlay = null;
+        }
       }, false);
       
       w.focus();

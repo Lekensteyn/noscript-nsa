@@ -250,22 +250,25 @@ ObstructionChecker.prototype = {
       let buf1 = imgData1.data, buf2 = imgData2.data;
       
       let bgR = buf1[0], bgG = buf1[1], bgB = buf1[2];
-      let diff = 0, tot = 0, threshold = .05;
-      for (let x = 0, w = box.width; x < w; x++) {
-        for (let y = 0, h = box.height; y < h; y++) {
-          let p = y * h + x * 4;
-          let r1 = buf1[p], r2 = buf2[p],
-              g1 = buf1[++p], g2 = buf2[p],
-              b1 = buf1[++p], b2 = buf2[p];
-          if (r1 === r2 && g1 === g2 && b1 === b2 || r1 === 255 && g1 === 255 && b1 === 255) {
-            tot++;
-          } else if (r1 !== bgR || g1 !== bgG || b1 !== bgB) {
-            tot++;
-            diff++;
-            if (diff / tot > threshold) {
-              ret = true;
-              break;
-            }
+      const threshold = .05;
+      const blen = buf1.length;
+      const tot = blen / 4;
+      const maxDiff = Math.round(tot * threshold);
+      const minEq = tot - maxDiff;
+      let eq = 0;
+      let diff = 0;
+      for (let p = blen; p-- > 0;) {
+        let b1 = buf1[--p], b2 = buf2[p],
+            g1 = buf1[--p], g2 = buf2[p],
+            r1 = buf1[--p], r2 = buf2[p];
+        if (r1 === r2 && g1 === g2 && b1 === b2 || r1 === 255 && g1 === 255 && b1 === 255) {
+          eq++;
+          if (eq > minEq) break;
+        } else if (r1 !== bgR || g1 !== bgG || b1 !== bgB) {
+          diff++;
+          if (diff > maxDiff) {
+            ret = true;
+            break;
           }
         }
       }
