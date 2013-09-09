@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+
+<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+ xmlns:h="http://www.w3.org/1999/xhtml"
+>
+
+ 
+  <setting id="nsa-presets-setting" title="Permissions Preset" type="control">
+    <radiogroup id="nsa-presets" oncommand="nsaUI.applyPreset(this)">
+      <button label="..." type="radio" group="nsa-presets-group"/>
+    </radiogroup>
+  </setting>
+  
+  <setting pref="extensions.nsa.policy" type="string" title="Raw Permissions" multiline="true" rows="3">
+    Just JSON for debugging purposes, don't touch if you don't know what you're doing!
+  </setting>
+  <setting pref="extensions.nsa.clearClick.enabled" type="bool" title="Enable ClearClick">
+    The only true Clickjacking protection
+  </setting>
+  <setting pref="extensions.nsa.xssFilter.enabled" type="bool" title="Enable XSS Filter">
+    The best Cross-Site Scripting protection
+  </setting>
+  <setting pref="extensions.nsa.ABE.enabled" type="bool" title="Enable ABE (App Boundaries Enforcer)">
+    CSRF and DNS rebinding protection for your router and web applications
+  </setting>
+  <setting pref="services.sync.engine.noscript" type="bool" title="Enable Remote Sync">
+    Safely synchronize your encrypted NoScript settings and permissions across multiple devices.
+  </setting>
+  <setting title="Factory settings" type="control">
+    Restore default preferences
+    <button id="nsa-reset-button" label="Reset" oncommand="nsaUI.resetPrefs(document)" />
+  </setting>
+</vbox>

@@ -1,0 +1,9 @@
+
+#nsa-presets button[checked="true"] {
+  background-color: #444 !important;
+  color: white !important;
+}
+
+.popup-notification-icon[popupid^="NoScript."] {
+  list-style-image: url(icon64.png);
+}
