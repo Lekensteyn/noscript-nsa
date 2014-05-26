@@ -86,7 +86,8 @@ Load.attach = function(channel) {
     return last;
   }
   debug("Could not attach load info to " + channel.name + "\n" +
-        (last.location === channel.URI) + ", " + (last.location && last.location.spec) + "\n" +
+        (!last ? "(last is null)" :
+        (last.location === channel.URI) + ", " + (last.location && last.location.spec)) + "\n" +
         channel instanceof Ci.nsIWritablePropertyBag2
     );
   return null;
