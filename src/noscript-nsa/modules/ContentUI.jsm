@@ -323,6 +323,7 @@ UI.prototype = {
 
   onResize: function(ev) {
     // coalesce pending resize events
+    let android = false && IPC.isAndroidNative;
     if (ev) {
       if (!this._resizePending) {
         this._resizePending = true;
@@ -335,13 +336,13 @@ UI.prototype = {
     let zoom = w.QueryInterface(Ci.nsIInterfaceRequestor)
             .getInterface(Ci.nsIDOMWindowUtils).screenPixelsPerCSSPixel;
     
-    if (zoom === 1 && w.screen.width === w.outerWidth && IPC.isAndroidNative) {
+    if (zoom === 1 && w.screen.width === w.outerWidth && android) {
       let d = w.document;
       let ref = d.getAnonymousElementByAttribute(d.documentElement, "anonid", "reference");
       zoom = w.outerWidth / (ref && ref.offsetLeft || w.innerWidth);
     }
     let trigger = this.trigger;
-    trigger.style.fontSize = zoom === 1 ? "" : (32 / zoom) + "px";
+    trigger.style.fontSize = zoom === 1 ? "" : (0.8 / zoom) + "cm";
     
     if (this.hidden && ev) return;
     
@@ -356,7 +357,7 @@ UI.prototype = {
                    
     if (zoom != 1.0 || mv.fullZoom != 1.0) {
       mv.fullZoom = 1;
-      if (IPC.isAndroidNative) d.body.style.fontSize = (10 / zoom) + "px";
+      if (android) d.body.style.fontSize = (10 / zoom) + "px";
     } else d.body.style.fontSize = "";
   
     let clientWidth = d.documentElement.clientWidth;

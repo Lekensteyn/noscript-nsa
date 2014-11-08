@@ -291,7 +291,7 @@ ChannelReplacement.prototype = {
       overlap;
 
     if (!(this.window &&
-          (overlap = ChannelReplacement.getLoadingChannel(this.window)) !== oldChan)) {
+          (overlap = ChannelReplacement.getLoadingChannel(this.window)) && overlap !== oldChan)) {
       try {
         oldChan.loadGroup = this.loadGroup;
     
