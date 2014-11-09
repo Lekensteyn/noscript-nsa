@@ -170,7 +170,10 @@ Policy.prototype = {
     if (!site) return "";
     
     const map = this.map;
-    
+
+    // Ignore port numbers
+    site = site.replace(/:\d+$/, "");
+
     // exact match
     if (site in map) return site;
     
