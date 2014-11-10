@@ -5,7 +5,7 @@
  
    <em:id>{73a6fe31-595d-460b-a920-fcc0f8843232}</em:id>
    <em:name>NoScript</em:name>
-   <em:version>3.5a6rc201407162251</em:version>
+   <em:version>3.5a6rc201411091337-lekensteyn</em:version>
    <em:description>Extra protection for your Firefox: flexible trust-based blocking of scripts and plugins (blacklist or whitelist based), plus unique countermeasures against web-based attacks (XSS, Clickjacking and more).</em:description>
    <em:creator>Giorgio Maone</em:creator>
    <em:bootstrap>true</em:bootstrap>
@@ -17,7 +17,9 @@
    <em:optionsURL>resource://noscript_@VERSION@/content/options.xul</em:optionsURL>
    <em:optionsType>2</em:optionsType>
    
+   <!--
    <em:updateURL>https://secure.informaction.com/update/</em:updateURL>
+   -->
    
    <!-- Firefox -->
 
