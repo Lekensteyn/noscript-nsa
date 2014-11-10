@@ -14,6 +14,7 @@ Cu.import("resource://noscript_@VERSION@/modules/Policy.jsm");
 Cu.import("resource://noscript_@VERSION@/modules/Prefs.jsm");
 Cu.import("resource://noscript_@VERSION@/modules/IPC.jsm");
 Cu.import("resource://noscript_@VERSION@/modules/Browser.jsm");
+Cu.import("resource://noscript_@VERSION@/modules/ParentUI.jsm");
 Cu.import("resource://noscript_@VERSION@/modules/PermissionsUI.jsm");
 
 try {
@@ -111,10 +112,12 @@ const Parent = {
   },
 
   loadInWindow: function(win) {
+    UI.create(win);
     PermissionsUI.loadIntoWindow(win);
   },
   unloadFromWindow: function(win) {
     PermissionsUI.unloadFromWindow(win);
+    UI.dispose(win);
   },
   // nsIFrameMessageListener
   receiveMessage: function(msg) {
