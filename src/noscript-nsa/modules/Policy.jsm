@@ -12,6 +12,13 @@ var serial = 0;
 const SERIAL_RX = /"#serial":\*(\d+)/;
 
 function Policy(map) {
+  // map is an object consisting of:
+  //  - the three special keys (UNTRUSTED, TRUSTED, DEFAULTS) mapping to an
+  //    object. This has keys to permissions (js, plugin) and maps to true when
+  //    the permission is granted.
+  //  - domains which map to an the REFS index (0 = UNTRUSTED, 1 = TRUSTED).
+  //    These will be expanded by the resolve method (called indirectly by
+  //    unserialize).
   if (typeof map === "string")  this.unserialize(map);
   else this.map = this.resolve(map);
   
@@ -143,9 +150,13 @@ Policy.prototype = {
     this._notifyChanges();
   },
   
+  // Returns the map with any integer policy settings expanded to the
+  // permissions matching the policy TRUSTED/UNTRUSTED/DEFAULT.
   resolve: function(map) {
     delete map["#serial"];
+    // maps zones such as TRUSTED to the permissions (js, plugins, etc.)
     const byref = SPECIALS.map(function(k) map[k]);
+    // expands domain names to the granted permissions
     for (let [k, v] in Iterator(map)) {
       if (typeof v === "number") map[k] = byref[v];
     }
@@ -153,11 +164,16 @@ Policy.prototype = {
     return map;
   },
   
+  // returns the part of the domain that has a policy defined, or "" if the site
+  // uses the default policy.
   match: function(site) {
     if (!site) return "";
     
     const map = this.map;
-    
+
+    // Ignore port numbers
+    site = site.replace(/:\d+$/, "");
+
     // exact match
     if (site in map) return site;
     
@@ -184,23 +200,31 @@ Policy.prototype = {
     for (let p in perms) copy[p] = perms[p];
     return copy;
   },
+  // returns an object of granted permissions. See Policy()
   getPerms: function(site) this.getExactPerms(this.match(site)),
   getExactPerms: function(match) match ? this.map[match] : this.map.DEFAULT,
   
+  // Sets the permissions for this site. perms *must* be one of the UNTRUSTED,
+  // TRUSTED or DEFAULT keys (example: Policy.getInstance().TRUSTED). Otherwise,
+  // a custom permission is created.
   setPerms: function(site, perms, temp) {
+    // if the permissions are different from the default policy, save it. Also
+    // save the permissions if the default site is being set.
     if (perms && (perms !== this.map.DEFAULT || site === "DEFAULT")) {
       this.map[site] = perms;
+      // if marked as temporarily, it will be not be saved persistently
       if (temp) this._temp[site] = perms;
     }
     else {
       delete this.map[site];
       delete this._temp[site];
     }
+    // if a batch operation is in progress do not save immediately
     if (this._batch) this._changedSites.push(site);
     else this._notifyChanges(site);
   },
   
-  
+  // apply the policy from map (site to permissions). See setPerms.
   merge: function(map, temp) {
     this.batch(true);
     try {

@@ -15,6 +15,7 @@ Cu.import("resource://noscript_@VERSION@/modules/Prefs.jsm");
 Cu.import("resource://noscript_@VERSION@/modules/IPC.jsm");
 Cu.import("resource://noscript_@VERSION@/modules/Browser.jsm");
 Cu.import("resource://noscript_@VERSION@/modules/ParentUI.jsm");
+Cu.import("resource://noscript_@VERSION@/modules/PermissionsUI.jsm");
 
 try {
   Cu.import("resource://noscript_@VERSION@/modules/Sync.jsm");
@@ -56,7 +57,6 @@ const Parent = {
       this.root = root;
       this.contentScriptURL = root.fileURL("content/content.js");
       this.agentSheetURL = root.fileURL("content/browser.css");
-      this.userSheetURL = root.fileURL("content/user.css");
       IPC.parentManager.addMessageListener(IPC.MSG_GET_POLICY, this);
       
       IPC.globalManager.addMessageListener("noscript_@VERSION@:GetBase", this);
@@ -71,7 +71,6 @@ const Parent = {
       
       let sss = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
       sss.loadAndRegisterSheet(Services.io.newURI(this.agentSheetURL, null, null), sss.AGENT_SHEET);
-      sss.loadAndRegisterSheet(Services.io.newURI(this.userSheetURL, null, null), sss.USER_SHEET);
       try {
         Life.start(NoScriptSyncEngine);
       } catch (e) {
@@ -90,7 +89,6 @@ const Parent = {
     Browser.forEachWindow(this.unloadFromWindow, this, false);
     
     let sss = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
-    sss.unregisterSheet(Services.io.newURI(this.userSheetURL, null, null), sss.USER_SHEET);
     sss.unregisterSheet(Services.io.newURI(this.agentSheetURL, null, null), sss.AGENT_SHEET);
     
     IPC.globalManager.removeMessageListener("noscript_@VERSION@:GetBase", this);
@@ -115,8 +113,10 @@ const Parent = {
 
   loadInWindow: function(win) {
     UI.create(win);
+    PermissionsUI.loadIntoWindow(win);
   },
   unloadFromWindow: function(win) {
+    PermissionsUI.unloadFromWindow(win);
     UI.dispose(win);
   },
   // nsIFrameMessageListener
