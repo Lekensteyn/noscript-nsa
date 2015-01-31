@@ -50,7 +50,7 @@ Policy.getInstance = function() {
     instance = new Policy(this.getPref());
   } catch (e) {
     Cu.reportError(e);
-    Cu.import("resource:noscript_@VERSION@/modules/Defaults.jsm");
+    Cu.import("resource://noscript_@VERSION@/modules/Defaults.jsm");
     instance = Defaults.policy;
   }
 
@@ -62,11 +62,11 @@ Policy.PREF_NAME = "policy";
 Policy.CHANGE_TOPIC = "NoScript:policy-change";
 
 Policy.getPref = function() {
-  Cu.import("resource:noscript_@VERSION@/modules/Prefs.jsm");
+  Cu.import("resource://noscript_@VERSION@/modules/Prefs.jsm");
   return Prefs.get(this.PREF_NAME);
 }
 Policy.storePref = function(policy)  {
-  Cu.import("resource:noscript_@VERSION@/modules/Prefs.jsm");
+  Cu.import("resource://noscript_@VERSION@/modules/Prefs.jsm");
   Prefs.set(this.PREF_NAME, (policy || Policy.getInstance()).serialize());
 }
 

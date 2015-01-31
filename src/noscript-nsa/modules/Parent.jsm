@@ -207,6 +207,8 @@ function showPresets() {
 
 
 
+this.Parent = Parent;
+
 } catch(e) {
   Cu.reportError(e)
 }
