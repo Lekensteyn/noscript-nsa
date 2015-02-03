@@ -1,8 +1,16 @@
 #!/bin/sh
+if [ -z "$1" ]; then
+	set -- "$(curl -sI https://noscript.net/nsa/latest/ |
+		awk '/^Location:/{print $NF}')"
+	if [ -z "$1" ]; then
+		echo "Unable to detect version!"
+		exit 1
+	fi
+fi
 version=${1##*noscript-}
 version=${version%%.xpi*}
 filename="noscript-$version.xpi"
-url="http://noscript.net/nsa/latest/$filename"
+url="https://noscript.net/nsa/latest/$filename"
 
 # path to git dir
 thisdir="$(dirname "$(readlink -f "$0")")"

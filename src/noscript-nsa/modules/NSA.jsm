@@ -370,7 +370,10 @@ var Service = {
 
 
 var NSA = {
-  
+  // Returns an object. The 'perms' key is an object mapping a permission (js,
+  // plugin, etc.) to an object which maps site names to a boolean (true for
+  // allowed). The 'top' key maps to the top-level site (string). Example:
+  // {perms: {js: {"http://example.com": true}, top: "http://example.com"}
   getSources: function(win) win._NSA_sources || (win._NSA_sources = { perms: {} }),
   
   rebuildSources: function(win) {
@@ -379,6 +382,7 @@ var NSA = {
     return this.getSources(win);
   },
   
+  // returns the permission flags for sites. Example: {"example.com": true}
   getSourcesFor: function(perm, win) {
     let perms = this.getSources(win).perms;
     return perm in perms ? perms[perm] : perms[perm] = {__proto__: null};

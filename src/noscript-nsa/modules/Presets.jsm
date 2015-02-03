@@ -3,9 +3,14 @@ const {utils: Cu} = Components;
 
 Cu.import("resource://noscript_@VERSION@/modules/Policy.jsm");
 
+// A preset determines what permissions (JS, plugins, etc.) are granted given
+// the trust level of a site (trusted, untrusted, default (not marked)). In the
+// "blacklist" preset, default means the same as trusted. In the "whitelist"
+// preset on the other hand, it means "untrusted" (see below).
 var Presets = {
   get map() map,
   get list() list,
+  // returns the active Preset instance or null if it is completely different
   get current() {
     let p = Policy.getInstance().map;
     let reference = [p.TRUSTED, p.UNTRUSTED, p.DEFAULT].toSource();
@@ -13,6 +18,7 @@ var Presets = {
       if (reference === (i._source || (i._source = [i.TRUSTED, i.UNTRUSTED, i.DEFAULT].toSource())))
         return i;
     }
+    // unknown preset
     return null;
   }
 }

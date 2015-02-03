@@ -28,7 +28,10 @@ fi
 tmpdir=$(mktemp -d)
 trap "rm -rf $tmpdir" EXIT
 cd "$tmpdir"
-unzip -xoq "$xpi"
+unzip -q "$xpi"
+# Somehow the modes are completely messed up. First everything was executable...
+# ok, but then since 3.5a7/modules/ resulted in mode 0???
+chmod -R a-rwx,ug+rwX,o+rX "$tmpdir"
 
 if [ -e "$NSDIRNAME" ]; then
 	echo "'$NSDIRNAME' already exists in XPI?!"
@@ -45,8 +48,6 @@ elif [ ! -d "$version" ]; then
 fi
 
 ### POST-PROCESSING
-# who thought it was a good idea to make everything executable...?
-chmod -R a-x,a+X "$tmpdir"
 # Remove CR (a.k.a. Windows line endings) and ensure line ending
 find "$tmpdir" -type f \
 	-regex '.*\(txt\|xml\|rdf\|xul\|js\|css\|jsm\|html\)' -print0 |

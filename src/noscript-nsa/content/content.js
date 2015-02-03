@@ -28,7 +28,6 @@ dump("Loading content script...\n");
     Cu.import("resource://noscript_@VERSION@/modules/IPC.jsm");
     Cu.import("resource://noscript_@VERSION@/modules/NSA.jsm");
     Cu.import("resource://noscript_@VERSION@/modules/ClearClick.jsm");
-    XPCOMUtils.defineLazyModuleGetter(this, "UI", "resource://noscript_@VERSION@/modules/ContentUI.jsm");
     
     let self = this;
     
@@ -38,9 +37,6 @@ dump("Loading content script...\n");
           let sources = NSA.getSources(content);
           if (force && !sources.top) sources = NSA.rebuildSources(content);
           sendAsyncMessage(IPC.MSG_RECEIVE_SOURCES, sources);
-          let ui = UI.get(content);
-          if (ui) ui.sync(sources);
-          else UI.create(content);
         }
       } catch (e) {
         log(e);
@@ -74,7 +70,6 @@ dump("Loading content script...\n");
               removeEventListener("NSA:SourcesChanged", listener, false);
               IPC.DOMMessages.disconnect(self);
               
-              UI.dispose(content);
               ClearClick.detach(self);
               
               NSA.shutdown();
@@ -91,7 +86,6 @@ dump("Loading content script...\n");
         switch(ev.type) {
           case "DOMContentLoaded":
           case "pageshow":
-            if (ev.target == content.document && !UI.get(content)) UI.create(content);
             content._NSA_loaded = true;
           case "NSA:SourcesChanged":
             syncUI();
@@ -114,9 +108,6 @@ dump("Loading content script...\n");
     
     NSA.startup();
     
-    if (/^(?:https?|file):/.test(content.location.href)) // updated XPI
-        content.setTimeout(function() UI.create(content), 500);
-        
   } catch (e) { Components.utils.reportError(e + "\n" + e.stack); }
 })();
 

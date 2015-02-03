@@ -1,6 +1,0 @@
-@-moz-document regexp("(?:https?|file):.*")
-{
-  html:not(.noscript-ui) {
-    -moz-binding: url(ns.xml#body) !important;
-  }
-}
