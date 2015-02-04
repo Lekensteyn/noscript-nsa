@@ -154,7 +154,7 @@ var ScriptSurrogate = {
     })(fileURI);
   },
   
-    getScripts: function(scriptURL, pageURL, noScript, scripts) {
+  getScripts: function(scriptURL, pageURL, noScript, scripts) {
 
     var isPage = scriptURL === pageURL;
 
