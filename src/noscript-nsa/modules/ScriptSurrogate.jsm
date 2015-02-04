@@ -14,12 +14,15 @@ XPCOMUtils.defineLazyModuleGetter(this, "FS", "resource://noscript_@VERSION@/mod
 
 var ScriptSurrogate = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsISupportsWeakReference]),
-  
+  JS_VERSION: "1.8",
   enabled: true,
   prefs: null,
   sandbox: true,
-  syntaxChecker: new SyntaxChecker(),
-   
+  
+  get syntaxChecker() {
+    delete this.syntaxChecker   
+    return this.syntaxChecker = new SyntaxChecker(this.JS_VERSION);
+  },
   get mappings() {
     delete this.mappings;
     this._init();
