@@ -349,7 +349,9 @@ const ABE = {
     
     try {
       downloading[host] = true;
-     
+      
+      this.log("Trying to fetch rules for " + host);
+      
       uri = uri.clone();
       uri.scheme = "https";
       uri.path = "/rules.abe";
@@ -494,7 +496,7 @@ const ABE = {
   log: function(msg) {
     if (this.verbose) {
       if (msg.stack) msg = msg.message + "\n" + msg.stack;
-      Services.console.logStringMessage("[ABE] " + msg);
+      Services.console.logStringMessage("[ABE] " + msg + "\n");
     }
   }
 }
@@ -1174,9 +1176,10 @@ var ABEStorage = {
     for (let j = keys.length; j-- > 0;) {
       let k = keys[j];
       if (branch.prefHasUserValue(k)) {
+        log("Resetting ABE ruleset " + k + "\n");
         try {
           branch.clearUserPref(k);
-        } catch(e) { log(e); }
+        } catch(e) { log(e + "\n"); }
       }
     }
   },
