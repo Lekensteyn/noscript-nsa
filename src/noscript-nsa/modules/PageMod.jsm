@@ -68,3 +68,5 @@ var PageMod = Prefs.sub("pageMod").bind([
     ScriptSurrogate.apply(doc, url, url, jsBlocked, scripts);
   } 
 });
+
+this.PageMod = PageMod;
