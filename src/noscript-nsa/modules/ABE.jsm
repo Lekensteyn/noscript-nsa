@@ -384,7 +384,7 @@ const ABE = {
         
       var xhr = Cc["@mozilla.org/xmlextras/xmlhttprequest;1"].createInstance(Ci.nsIXMLHttpRequest);
       xhr.mozBackgroundRequest = true;
-      xhr.open("GET", uri.spec, true);
+      xhr.open("GET", uri.spec, true); // async if we can spin our own event loop
       
       var channel = xhr.channel; // need to cast
       IOUtil.attachToChannel(channel, "ABE.preflight", DUMMY_OBJ);
@@ -913,15 +913,15 @@ ABEPredicate.prototype = {
   match: function(req) {
     return (this.allMethods || this.subdoc && req.isSubdoc ||
             this.inclusion && req.isOfType(this.inclusionTypes) ||
-        this.methodRx && this.methodRx.test(req.method)) &&
-        (this.allOrigins ||
+            this.methodRx && this.methodRx.test(req.method)) &&
+            (this.allOrigins ||
               this.self && req.isSelf ||
               this.sameDomain && req.isSameDomain ||
               this.sameBaseDomain && req.isSameBaseDomain ||
-        (this.permissive
+                (this.permissive
                   ? req.matchAllOrigins(this.origin)
                   : req.matchSomeOrigins(this.origin)) || this.local && req.localOrigin
-        );
+                );
   },
   
   toString: function() {
@@ -1028,7 +1028,7 @@ ABERequest.prototype = Lang.memoize({
    
   replace: function(newMethod, newURI, callback) {
     new ChannelReplacement(this.channel, newURI, newMethod)
-      .replace(newMethod || newURI, callback);
+        .replace(newMethod || newURI, callback);
     return true;
   },
   
