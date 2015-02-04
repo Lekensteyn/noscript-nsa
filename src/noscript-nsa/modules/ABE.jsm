@@ -56,6 +56,13 @@ const ABE = {
     ABEStorage.prefs.dispose();
   },
   
+  init: function(prefParent) {
+    const ps = this.prefService = Cc["@mozilla.org/preferences-service;1"]
+      .getService(Ci.nsIPrefService).QueryInterface(Ci.nsIPrefBranch);
+    ABEStorage.init(Prefs.sub("ABE"));
+    DoNotTrack.init(Prefs.sub("doNotTrack"));
+  },
+  
   get disabledRulesetNames() {
     return this.rulesets.filter(function(rs) { return rs.disabled; })
       .map(function(rs) { return rs.name; }).join(" ");
@@ -96,6 +103,23 @@ const ABE = {
   
   get rulesets() {
     return this.localRulesets.concat(this.siteRulesets);
+  },
+  
+  checkFrameOpt: function(w, chan) {
+    try {
+      if (!w) {
+        var ph = PolicyState.extract(chan);
+        var ctx = ph.context;
+        w = ctx.self || ctx.ownerDocument.defaultView;
+      }
+      switch (chan.getResponseHeader("X-FRAME-OPTIONS").toUpperCase()) {
+        case "DENY":
+          return true;
+        case "SAMEORIGIN":
+          return chan.URI.prePath != w.top.location.href.match(/^https?:\/\/[^\/]*/i)[0];
+      }
+    } catch(e) {}
+    return false;
   },
   
   clear: function() {
@@ -197,7 +221,9 @@ const ABE = {
     
     if (this.deferIfNeeded(req))
       return false;
-   
+    
+    if (DoNotTrack.enabled) DoNotTrack.apply(req);
+    
     var t;
     if (this.verbose) {
       this.log("Checking #" + req.serial + ": " + req.destination + " from " + req.origin + " - " + loadFlags);
@@ -349,14 +375,16 @@ const ABE = {
     
     try {
       downloading[host] = true;
-     
+      
+      this.log("Trying to fetch rules for " + host);
+      
       uri = uri.clone();
       uri.scheme = "https";
       uri.path = "/rules.abe";
         
       var xhr = Cc["@mozilla.org/xmlextras/xmlhttprequest;1"].createInstance(Ci.nsIXMLHttpRequest);
       xhr.mozBackgroundRequest = true;
-      xhr.open("GET", uri.spec, true);
+      xhr.open("GET", uri.spec, true); // async if we can spin our own event loop
       
       var channel = xhr.channel; // need to cast
       IOUtil.attachToChannel(channel, "ABE.preflight", DUMMY_OBJ);
@@ -445,6 +473,11 @@ const ABE = {
   setSandboxed: function(channel) {
     IOUtil.attachToChannel(channel, ABE.SANDBOX_KEY, DUMMY_OBJ);
   },
+  sandbox: function(docShell, sandboxed) {
+    docShell.allowJavascript = docShell.allowPlugins =
+        docShell.allowMetaRedirects= docShell.allowSubframes = !sandboxed;
+  },
+  
   
   updateRedirectChain: function(oldChannel, newChannel) {
     this._handleDownloadRedirection(oldChannel, newChannel);
@@ -494,7 +527,7 @@ const ABE = {
   log: function(msg) {
     if (this.verbose) {
       if (msg.stack) msg = msg.message + "\n" + msg.stack;
-      Services.console.logStringMessage("[ABE] " + msg);
+      Services.console.logStringMessage("[ABE] " + msg + "\n");
     }
   }
 }
@@ -806,16 +839,16 @@ ABEPredicate.prototype = {
   permissive: false,
   
   subdoc: false,
-	self: false,
+  self: false,
   sameDomain: false,
   sameBaseDomain: false,
-	local: false,
-	
-	allMethods: true,
-	allOrigins: true,
-	
-	methodRx: null,
-	origin: null,
+  local: false,
+  
+  allMethods: true,
+  allOrigins: true,
+  
+  methodRx: null,
+  origin: null,
   
   inclusion: false,
   inlcusionTypes: [],
@@ -851,41 +884,44 @@ ABEPredicate.prototype = {
     };
   },
  
-	_methodFilter: function(m) {
-		switch(m) {
-			case "SUB":
-				return !(this.subdoc = true);
-			case "ALL":
-				return !(this.allMethods = true);
-		}
-		return true;
-	},
+  _methodFilter: function(m) {
+    switch(m) {
+      case "SUB":
+	return !(this.subdoc = true);
+      case "ALL":
+	return !(this.allMethods = true);
+    }
+    return true;
+  },
   
-	_originFilter: function(s) {
-		switch(s) {
-			case "SELF":
-				return !(this.self = true);
+  _originFilter: function(s) {
+    switch(s) {
+      case "SELF":
+	return !(this.self = true);
       case "SELF+":
         return !(this.sameDomain = true);
       case "SELF++":
         return !(this.sameBaseDomain = true);
-			case "LOCAL":
-				return !(this.local = true);
-			case "ALL":
-				return !(this.allOrigins = true);
-		}
-		return true;
-	},
+      case "LOCAL":
+        return !(this.local = true);
+      case "ALL":
+        return !(this.allOrigins = true);
+    }
+    return true;
+  },
 	
   match: function(req) {
     return (this.allMethods || this.subdoc && req.isSubdoc ||
             this.inclusion && req.isOfType(this.inclusionTypes) ||
-						this.methodRx && this.methodRx.test(req.method)) &&
-			(this.allOrigins ||
-        this.self && req.isSelf || this.sameDomain && req.isSameDomain || this.sameBaseDomain && req.isSameBaseDomain ||
-				(this.permissive ? req.matchAllOrigins(this.origin) : req.matchSomeOrigins(this.origin)) ||
-				this.local && req.localOrigin
-			);
+            this.methodRx && this.methodRx.test(req.method)) &&
+            (this.allOrigins ||
+              this.self && req.isSelf ||
+              this.sameDomain && req.isSameDomain ||
+              this.sameBaseDomain && req.isSameBaseDomain ||
+                (this.permissive
+                  ? req.matchAllOrigins(this.origin)
+                  : req.matchSomeOrigins(this.origin)) || this.local && req.localOrigin
+                );
   },
   
   toString: function() {
@@ -969,8 +1005,9 @@ ABERequest.prototype = Lang.memoize({
               ? channel.originalURI 
               : IOUtil.extractInternalReferrer(channel)
             ) || null;
-            
-        if (!ou && (channel instanceof Ci.nsIHttpChannelInternal)) {
+      }
+      if (!ou) {
+        if (channel instanceof Ci.nsIHttpChannelInternal) {
           ou = channel.documentURI;
           if (!ou || IOUtil.unwrapURL(ou).spec === this.destination) ou = null;
         }
@@ -991,7 +1028,7 @@ ABERequest.prototype = Lang.memoize({
    
   replace: function(newMethod, newURI, callback) {
     new ChannelReplacement(this.channel, newURI, newMethod)
-      .replace(newMethod || newURI, callback);
+        .replace(newMethod || newURI, callback);
     return true;
   },
   
@@ -1114,7 +1151,7 @@ ABERequest.prototype = Lang.memoize({
   
   isSubdoc: function() {
     if (this.isDoc) {
-      let w = this.window;
+      var w = this.window;
       return (w != w.top);
     }
     var channel = this.channel;
@@ -1163,6 +1200,34 @@ var ABEStorage = {
       Thread.asap(this.loadRules, this);
     }
   },
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsISupportsWeakReference]),
+  observe: function(prefs, topic, name) {
+    switch(name) {
+      case "wanIpAsLocal":
+        WAN.enabled = prefs.getBoolPref(name);
+      break;
+      case "wanIpCheckURL":
+        WAN.checkURL = prefs.getCharPref(name);
+      break;
+      case "localExtras":
+        DNS.localExtras = AddressMatcher.create(prefs.getCharPref(name));
+      break;
+      case "enabled":
+      case "siteEnabled":
+      case "allowRulesetRedir":
+      case "skipBrowserRequests":
+        ABE[name] = prefs.getBoolPref(name);
+      break;
+      case "disabledRulesetNames":
+        ABE[name] = prefs.getCharPref(name);
+      break;
+      default:
+        if (!this._updating && name.indexOf("rulesets.") === 0) {
+          this._updating = this._dirty = true;
+          Thread.asap(this.loadRules, this);
+        }
+    }
+  },
   
   get _rulesetPrefs() this.prefs.keys("rulesets"),
   clear: function() {
@@ -1171,9 +1236,10 @@ var ABEStorage = {
     for (let j = keys.length; j-- > 0;) {
       let k = keys[j];
       if (branch.prefHasUserValue(k)) {
+        log("Resetting ABE ruleset " + k + "\n");
         try {
           branch.clearUserPref(k);
-        } catch(e) { log(e); }
+        } catch(e) { log(e + "\n"); }
       }
     }
   },
@@ -1288,4 +1354,301 @@ var OriginTracer = {
   }
 }
 
-ABEStorage.init(Prefs.sub("ABE"));
+
+var DoNotTrack = {
+  enabled: true,
+  exceptions: null,
+  forced: null,
+
+  init: function(prefs) {
+    this.prefs = prefs;
+    for each (let k in prefs.getChildList("", {})) {
+      this.observe(prefs, null, k);
+    }
+    prefs.addObserver("", this, true);
+  },
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsISupportsWeakReference]),
+  observe: function(prefs, topic, name) {
+    switch(name) {
+      case "enabled":
+        this.enabled = prefs.getBoolPref(name);
+       break;
+      case "exceptions":
+      case "forced":
+        this[name] = AddressMatcher.create(prefs.getComplexValue(name, Ci.nsISupportsString).data);
+      break;
+    }
+  },
+
+  apply: function(/* ABEReq */ req) {
+    let url = req.destination;
+      
+    try {
+      if (
+          (this.exceptions && this.exceptions.test(url) ||
+            req.localDestination ||
+            req.isDoc && req.method === "POST" && req.originURI.host === req.destinationURI.host
+          ) &&
+          !(this.forced && this.forced.test(url))
+           // TODO: find a way to check whether this request is gonna be WWW-authenticated
+        )
+        return;
+       
+      let channel = req.channel;
+      channel.setRequestHeader("DNT", "1", false);
+      
+      // reorder headers to mirror Firefox 4's behavior
+      let conn = channel.getRequestHeader("Connection");
+      channel.setRequestHeader("Connection", "", false);
+      channel.setRequestHeader("Connection", conn, false);
+    } catch(e) {}
+  },
+  
+  getDOMPatch: function(docShell) {
+    try {
+      if (docShell.document.defaultView.navigator.doNotTrack !== "yes" &&
+          docShell.currentDocumentChannel.getRequestHeader("DNT") === "1") {
+        return 'Object.defineProperty(window.navigator, "doNotTrack", { configurable: true, enumerable: true, value: "yes" });';
+      }
+    } catch (e) {}
+    return "";
+  },
+}
+
+const WAN = {
+  IP_CHANGE_TOPIC: "abe:wan-iface-ip-changed",
+  ip: null,
+  ipMatcher: null,
+  fingerprint: '',
+  findMaxInterval: 86400000, // 1 day 
+  checkInterval: 14400000, // 4 hours
+  fingerInterval: 900000, // 1/4 hour
+  checkURL: "https://secure.informaction.com/ipecho/",
+  lastFound: 0,
+  lastCheck: 0,
+  skipIfProxied: true,
+  noResource: false,
+  logging: true,
+  fingerprintLogging: false,
+  fingerprintUA: "Mozilla/5.0 (ABE, https://noscript.net/abe/wan)",
+  fingerprintHeader: "X-ABE-Fingerprint",
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsISupportsWeakReference]),
+  
+  log: function(msg) {
+    var cs = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
+    return (this.log = function(msg) {
+      if (this.logging) cs.logStringMessage("[ABE WAN] " + msg);
+    })(msg);
+    
+  },
+  
+  _enabled: false,
+  _timer: null,
+  _observing: false,
+  get enabled() {
+    return this._enabled;
+  },
+  set enabled(b) {
+    if (this._timer) this._timer.cancel();
+    if (b) {
+      const t = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
+      t.initWithCallback({
+        notify: function() { WAN._periodic() },
+        context: null
+      }, this.checkInterval, t.TYPE_REPEATING_SLACK);
+      this._timer = t;
+      Thread.delay(this._periodic, 1000, this, [this._enabled != b]);
+      if (!this._observing) {
+        this._observing = true;
+        OS.addObserver(this, "network:offline-status-changed", true);
+        OS.addObserver(this, "wake_notification", true);
+      }
+    } else {
+      this._timer = this.ip = this.ipMatcher = null;
+    }
+    return this._enabled = b;
+  },
+  _observingHTTP: false,
+  
+  observe: function(subject, topic, data) {
+    if (!this.enabled) return;
+    
+    switch(topic) {
+      case "wake_notification":
+        if (!this._observingHTTP) OS.addObserver(this, "http-on-examine-response", true);
+        return;
+      case "http-on-examine-response":
+        OS.removeObserver(this, "http-on-examine-response");
+        this._observingHTTP = false;
+        break;
+      case "network:offline-status-changed":
+        if (data === "online")
+          break;
+      default:
+        return;
+    }
+
+    this._periodic(true);
+  },
+  
+  _periodic: function(forceFind) {
+    if (forceFind) this.lastFound = 0;
+    
+    var t = Date.now();
+    if (forceFind ||
+        t - this.lastFound > this.findMaxInterval ||
+        t - this.lastCheck > this.checkInterval) {  
+      this.findIP(this._findCallback);
+    } else if (this.fingerprint) {
+      this._takeFingerprint(this.ip, this._fingerprintCallback);
+    }
+    this.lastCheck = t;
+  },
+  
+  _findCallback: function(ip) {
+    WAN._takeFingerprint(ip);
+  },
+  _fingerprintCallback: function(fingerprint, ip) {
+    if (fingerprint != WAN.fingerprint) {
+      WAN.log("Resource reacheable on WAN IP " + ip + " changed!");
+      if (ip == WAN.ip) WAN._periodic(true);
+    }
+  },
+  
+  _takeFingerprint: function(ip, callback) {
+    if (!ip) {
+      this.log("Can't fingerprint a null IP");
+      return;
+    }
+    var url = "http://" + (ip.indexOf(':') > -1 ? "[" + ip + "]" : ip);
+    var xhr = this._createAnonXHR(url);
+    var ch = xhr.channel;
+    ch.setRequestHeader("User-Agent", this.fingerprintUA, false);
+    ch.loadFlags = ch.loadFlags & ~ch.LOAD_ANONYMOUS; // prevents redirect loops on some routers
+    var self = this;
+    xhr.addEventListener("readystatechange", function() {
+
+      if (xhr.readyState == 4) {
+
+      var fingerprint = '';
+      try {
+        const ch = xhr.channel;
+
+        if (!ch.status) fingerprint =
+          xhr.status + " " + xhr.statusText + "\n" +
+          (xhr.getAllResponseHeaders() + "\n" + xhr.responseText)
+            .replace(/\d/g, '').replace(/\b[a-f]+\b/gi, ''); // remove decimal and hex noise
+        } catch(e) {
+          self.log(e);
+        }   
+
+        if (self.fingerprintLogging)
+          self.log("Fingerprint for " + url + " = " + fingerprint);
+        
+        if (fingerprint && /^\s*Off\s*/i.test(xhr.getResponseHeader(self.fingerprintHeader)))
+          fingerprint = '';
+        
+        if (callback) callback(fingerprint, ip);
+        self.fingerprint = fingerprint;
+      }
+    }, false);
+    xhr.send(null);
+
+  },
+    
+  _createAnonXHR: function(url, noproxy) {
+    var xhr = Cc["@mozilla.org/xmlextras/xmlhttprequest;1"].createInstance(Ci.nsIXMLHttpRequest);
+    xhr.mozBackgroundRequest = true;
+    xhr.open("GET", url, true);
+    const ch = xhr.channel;
+    const proxyInfo = noproxy && IOUtil.getProxyInfo(ch);
+    if (!proxyInfo || proxyInfo.type == "direct" || proxyInfo.host && DNS.isLocalHost(proxyInfo.host)) {
+      if ((ch instanceof Ci.nsIHttpChannel)) {
+        // cleanup headers
+        this._requestHeaders(ch).forEach(function(h) {
+          if (h != 'Host') ch.setRequestHeader(h, '', false); // clear header
+        });
+      }
+      ch.loadFlags = ch.LOAD_BYPASS_CACHE | ch.LOAD_ANONYMOUS;
+    } else xhr = null;
+    return xhr;
+  },
+  
+  _callbacks: null,
+  _finding: false,
+  findIP: function(callback) {
+    if (callback) (this._callbacks = this._callbacks || []).push(callback);
+    if (IOS.offline) {
+      this._findIPDone(null, "offline");
+      return;
+    }
+    if (this._finding) return;
+    this._finding = true;
+    var sent = false;
+    try {
+      var xhr = this._createAnonXHR(this.checkURL,this.skipIfProxied);
+      if (xhr) {
+        let self = this;
+        xhr.addEventListener("readystatechange", function() {
+          if (xhr.readyState == 4) {
+            let ip = null;
+            if (xhr.status == 200) {
+              ip = xhr.responseText.replace(/\s+/g, '');
+              if (!/^[\da-f\.:]+$/i.test(ip)) ip = null;
+            }
+            self._findIPDone(ip, xhr.responseText);
+          }
+        }, false);
+        xhr.send(null);
+        this.log("Trying to detect WAN IP...");
+        sent = true;
+      }
+    } catch(e) {
+      this.log(e + " - " + e.stack)
+    } finally {
+      this._finding = sent;
+      if (!sent) this._findIPDone(null);
+    }
+  },
+  
+  _findIPDone: function(ip) {
+    let ipMatcher = AddressMatcher.create(ip);
+    if (!ipMatcher) ip = null;
+    if (ip) {
+      try {
+        if (this._callbacks) {
+          for each (let cb in this._callbacks) cb(ip);
+          this._callbacks = null;
+        }
+      } catch(e) {
+        this.log(e);
+      }
+      
+      if (ip != this.ip) {
+        OS.notifyObservers(this, this.IP_CHANGE_TOPIC, ip);
+      }
+      
+      this.ip = ip;
+      this.ipMatcher = ipMatcher;
+      this.lastFound = Date.now();
+      
+       this.log("Detected WAN IP " + ip);
+    } else {
+      this.lastFound = 0;
+      this.fingerprint = '';
+      this.log("WAN IP not detected!");
+    }
+   
+    this._finding = false;
+  },
+  
+  
+  _requestHeaders: function(ch) {
+    var hh = [];
+    if (ch instanceof Ci.nsIHttpChannel)
+      ch.visitRequestHeaders({
+        visitHeader: function(name, value) { hh.push(name); }
+      });
+    return hh;
+  }
+};

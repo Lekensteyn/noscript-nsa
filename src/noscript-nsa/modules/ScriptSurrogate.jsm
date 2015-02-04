@@ -14,12 +14,16 @@ XPCOMUtils.defineLazyModuleGetter(this, "FS", "resource://noscript_@VERSION@/mod
 
 var ScriptSurrogate = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsISupportsWeakReference]),
-  
+  JS_VERSION: "1.8",
   enabled: true,
   prefs: null,
   sandbox: true,
-  syntaxChecker: new SyntaxChecker(),
-   
+  sandboxInclusions: true,
+  
+  get syntaxChecker() {
+    delete this.syntaxChecker   
+    return this.syntaxChecker = new SyntaxChecker(this.JS_VERSION);
+  },
   get mappings() {
     delete this.mappings;
     this._init();
@@ -150,7 +154,7 @@ var ScriptSurrogate = {
     })(fileURI);
   },
   
-    getScripts: function(scriptURL, pageURL, noScript, scripts) {
+  getScripts: function(scriptURL, pageURL, noScript, scripts) {
 
     var isPage = scriptURL === pageURL;
 
@@ -194,7 +198,7 @@ var ScriptSurrogate = {
     
     if (this.enabled) {
       scripts = this.getScripts(scriptURL, pageURL, noScript, scripts);
-      if (!noScript && this.mappings.after.length && !document._noscriptAfterSurrogates) {
+      if (pageURL && !noScript && this.mappings.after.length && !document._noscriptAfterSurrogates) {
         document._noscriptAfterSurrogates = true;
         document.addEventListener("load", this._afterHandler, true);
       }
@@ -234,21 +238,36 @@ var ScriptSurrogate = {
     this.executeDOM(document, scriptBlock);
   },
   
+  _sandboxParams: {
+    wantXrays: false,
+    sandboxName: ""
+  },
+  
+  getPrincipal: function(doc) doc.defaultView,
+  
   executeSandbox: function(document, scriptBlock, env) {
     var w = document.defaultView;
     try {
       if (typeof w.wrappedJSObject === "object") w = w.wrappedJSObject;
-      var s = new Cu.Sandbox(w, { wantXrays: false });
-      s.window = w;
-      s.script = scriptBlock;
-      if (env) s.env = env;
-      Cu.evalInSandbox("window.eval(script)", s);
-    } catch (e) {
-      if (ns.consoleDump) {
-        ns.dump(e);
-        ns.dump(scriptBlock);
+      this._sandboxParams.sandboxName = "NoScript::ScriptSurrogate@" + document.documentURI;
+      this._sandboxParams.sandboxPrototype = w;
+      let s = new Cu.Sandbox(this.getPrincipal(document), this._sandboxParams);
+      if (!("top" in s)) s.__proto__ = w;
+      if (typeof env !== "undefined") {
+        s.env = env;
+        let ep = {};
+        for (let p in env) {
+          ep[p] = "rw";
+        }
+        env.__exposedProps__ = ep;
       }
+      let code = "with(window){" + scriptBlock + "}delete this.env;";
+      if ("keys" in Object) code += "for each(let p in Object.keys(this))window[p]=this[p];";
+      Cu.evalInSandbox(code, s, this.JS_VERSION);
+    } catch (e) {
       if (this.debug) Cu.reportError(e);
+    } finally {
+      delete this._sandboxParams.sandboxPrototype;
     }
   },
   
@@ -261,6 +280,7 @@ var ScriptSurrogate = {
       }
       
       var se = document.createElement("script");
+      se.type = "application/javascript;version=" + ScriptSurrogate.JS_VERSION;
       se.appendChild(document.createTextNode(scriptBlock));
       de.appendChild(se);
       de.removeChild(se);
@@ -269,7 +289,6 @@ var ScriptSurrogate = {
     }
   }
 }
-
 
 function SurrogateMapping(name) {
   this.name = name;
