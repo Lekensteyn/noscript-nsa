@@ -5,9 +5,9 @@ const {interfaces: Ci, classes: Cc, utils: Cu} = Components;
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-const PACKAGE_NAME = "nsa";
-const PREF_BRANCH = "extensions." + PACKAGE_NAME + ".";
-const prefSvc = Services.prefs;
+this.PACKAGE_NAME = "nsa";
+this.PREF_BRANCH = "extensions." + PACKAGE_NAME + ".";
+this.prefSvc = Services.prefs;
 
 const IPB = Ci.nsIPrefBranch;
 persistPending = false;
@@ -200,7 +200,7 @@ PrefsHelper.prototype = {
   }
 }
 
-const Prefs = new PrefsHelper(PREF_BRANCH);
+this.Prefs = new PrefsHelper(PREF_BRANCH);
 } catch(e) {
   dump(e);
 }
