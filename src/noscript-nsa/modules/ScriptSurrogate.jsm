@@ -202,10 +202,11 @@ var ScriptSurrogate = {
 
     if (!scripts) return false;
     
+    let win = document.defaultView;
     const runner = noScript
       ? this.fallback
       : scriptURL === pageURL
-        ? let (win = document.defaultView) win != win.top ? this.executeSandbox : this.execute
+        ? win != win.top ? this.executeSandbox : this.execute
         : this.sandbox ? this.executeSandbox : this.executeDOM;
     
     if (this.debug) {
