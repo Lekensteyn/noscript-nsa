@@ -5,7 +5,7 @@
  
    <em:id>{73a6fe31-595d-460b-a920-fcc0f8843232}</em:id>
    <em:name>NoScript</em:name>
-   <em:version>3.5a8-20150823-lekensteyn</em:version>
+   <em:version>3.5a10</em:version>
    <em:description>Extra protection for your Firefox: flexible trust-based blocking of scripts and plugins (blacklist or whitelist based), plus unique countermeasures against web-based attacks (XSS, Clickjacking and more).</em:description>
    <em:creator>Giorgio Maone</em:creator>
    <em:bootstrap>true</em:bootstrap>
@@ -18,9 +18,7 @@
    <em:optionsType>2</em:optionsType>
    
 
-   <!--
    <em:updateURL>https://secure.informaction.com/update/</em:updateURL>
-   -->
   
    
    <!-- Firefox -->
@@ -29,7 +27,7 @@
      <Description>
      <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
      <em:minVersion>18.0a1</em:minVersion>
-     <em:maxVersion>40.0</em:maxVersion>
+     <em:maxVersion>47.0</em:maxVersion>
      </Description>
    </em:targetApplication>
 
@@ -39,7 +37,7 @@
       <Description>
         <em:id>{aa3c5121-dab2-40e2-81ca-7ea25febc110}</em:id>
         <em:minVersion>18.0a1</em:minVersion>
-        <em:maxVersion>40.*</em:maxVersion>
+        <em:maxVersion>47.*</em:maxVersion>
       </Description>
     </em:targetApplication>
 
