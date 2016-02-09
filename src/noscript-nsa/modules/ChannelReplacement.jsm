@@ -191,9 +191,10 @@ ChannelReplacement.prototype = {
 
     const CES = Ci.nsIChannelEventSink;
     const flags = CES.REDIRECT_INTERNAL;
-    this._callSink(
-      Cc["@mozilla.org/netwerk/global-channel-event-sink;1"].getService(CES),
-      oldChan, newChan, flags);
+    // global-channel-event-sink is gone since 45.0a1
+    // https://hg.mozilla.org/mozilla-central/rev/e772b5154e0c
+    const GCES = Cc["@mozilla.org/netwerk/global-channel-event-sink;1"];
+    if (GCES) this._callSink(GCES.getService(CES), oldChan, newChan, flags);
     var sink;
     
     for (let cess = this.categoryManager.enumerateCategory("net-channel-event-sinks");
